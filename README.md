@@ -12,14 +12,14 @@ We get the agriculture data for 30 different types of crops from here and combin
 
 Research Questions -
 
-How does the ranking of the top 10 countries change in terms of annual CO2 emissions?
+1. How does the ranking of the top 10 countries change in terms of annual CO2 emissions?
 
-Which factors/predictors contribute the most to the top three CO2 emitter countries?
+2. Which factors/predictors contribute the most to the top three CO2 emitter countries?
 
-Is there a relationship between co2 emission and country size or life expectancy?
+3. Is there a relationship between co2 emission and country size or life expectancy?
 
-Which country has emitted the most CO2 in total since 1990?
+4. Which country has emitted the most CO2 in total since 1990?
 
-Which country has made the best progress in reducing CO2 emissions during the last decade?
+5. Which country has made the best progress in reducing CO2 emissions during the last decade?
 
-How does CO2 emission of Australia behave over the years compared to top two emitters?
+6. How does CO2 emission of Australia behave over the years compared to top two emitters?
