@@ -1,0 +1,687 @@
+---
+title: "Analyzing Global CO2 Emission data"
+#author: "Mon_Vapour"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+#runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=15, fig.height=10) 
+```
+
+Introduction
+===================================== 
+
+
+
+**Objective**
+
+Since the recent years, climate change has become increasingly alarming. The impact of it seems to be an serious issue for both humans and animals. As a result, the analysis in this report is regarding the **Co2 emission per country**. 
+
+Our analysis is developed from variables including country, year, co2, population, GDP, fossil fuel consumption, country size, agriculture production and life expectancy.
+We obtained the main dataset from [Our World in Data](https://github.com/owid/co2-data#%EF%B8%8F-download-our-complete-co2-and-greenhouse-gas-emissions-dataset--csv--xlsx--json) website. This dataset includes attributes like country name, year, total Co2 emission, GDP, population and other greenhouse gases. 
+
+Since the country size and Fossil Fuel data were not present in the dataset, we scraped it from [here](https://en.wikipedia.org/wiki/List_of_countries_and_dependencies_by_area) and [here](https://ourworldindata.org/fossil-fuels - “fossil-fuel-per-capita.csv) respectively.
+
+We get the agriculture data for 30 different types of crops from [here](https://ourworldindata.org/agricultural-production) and combined them together to get the total amount of production each year per country. Later we combined another dataset, [Life Expectancy](https://data.worldbank.org/indicator/SP.DYN.LE00.IN) from The World Bank website to get all the potential data which we need to answer our research questions. 
+
+**Research Questions**
+
+1. How does the ranking of the top 10 countries change in terms of annual CO2 emissions?
+
+2. Which factors/predictors contribute the most to the top three CO2 emitter countries?
+
+3. Is there a relationship between co2 emission and country size or life expectancy?
+
+4. Which country has emitted the most CO2 in total since 1990?
+
+5. Which country has made the best progress in reducing CO2 emissions during the last decade?
+
+6. How does CO2 emission of Australia behave over the years compared to top two emitters?
+
+
+
+
+###
+```{r img3422, echo = F, out.width = '10%'}
+knitr::include_graphics("sad.jpeg")
+```
+
+###
+```{r img2, echo = F, out.width = '10%'}
+knitr::include_graphics("sad2.jpeg")
+```
+
+
+Data Information
+===================================== 
+
+
+
+**Variable Information and Explanation**
+
+``` {r, echo= FALSE, warning= FALSE, message = FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(kableExtra)
+library(readr)
+#library(RColorBrewer)
+#library(randomcoloR)
+library(plotly)
+library(gapminder)
+library(flexdashboard)
+library(shiny)
+library(naniar)
+library(ggResidpanel)
+```
+
+```{r}
+final_data <- read_csv("final_data.csv")
+```
+
+
+### Table:1 **Column Names**
+```{r, echo= FALSE, warning= FALSE, message = FALSE, fig.width= 3}
+summary <- colnames(final_data)
+knitr::kable(summary, col.names = gsub("[.]", " ", names(summary)), align = "l", caption = "Column Names") %>% 
+kable_paper("hover")
+```
+
+### **Description**
+
+Below is the description of the variables used in the dataset:
+
++ *Code* : ISO 3166-1 alpha-3 – three-letter country codes
+
++ *country* : Geographic location
+
++ *year* : Year of observation
+
++ *co2* : Annual production-based emissions of carbon dioxide (CO2), measured in million tonnes.
+
++ *population* : Population by country
+
++ *gdp* : Gross domestic product measured in international-$
+
++ *totalproduction_tone* : Total agriculture production in tonnes
+
++ *total_size_km2* : Country size in km^2
+
++ *Fos_percap* : Fossil fuel consumption per capita 
+
++ *life_expectancy* : life expectancies by country over the years
+
+Question 1
+===================================== 
+
+
+
+Answering **Research Questions 1**
+
+
+Column {data-width=600}
+-------------------------------------
+
+### Fig:1 How does the ranking of the top 10 countries change in terms of annual CO2 emissions?
+
+![](animation.gif)
+
+
+### Findings
+
++ This race chart depicts the change in rank of the top 10 Co2 emitters in terms of annual Co2 emission between 1961 and 2018. The United States held the top position from 1961 until 2005, when China surpasses it and retained the top spot till 2018.
+
+
++ India was last in 1961, but in 2009 it rapidly surpassed Russia, which had always been in the top three rankings, and remained in third place until 2018.
+
+
++ Countries such as Canada, Ukraine, and France have consistently been in the bottom three.
+
+
+Part A {data-navmenu="Question 2"}
+===================================== 
+Answering **Research Questions 2**
+
+Column {data-width=600}
+-------------------------------------
+
+### Fig:1 Which country has emitted the most CO2 in total since 1900?
+
+```{r}
+dt <-  read_csv("final_data.csv")
+
+q6 <- dt %>% 
+  filter(year >= 1990)%>%
+  dplyr::select("Code","country","year","co2")
+  
+
+```
+```{r}
+tot <- q6 %>%
+ group_by(country) %>%
+  summarise(total = sum(co2, na.rm = TRUE)) %>%
+    arrange(-total)
+
+
+tot %>% slice(n = 1:20) %>% 
+  ggplot(aes(fct_reorder(country, total), total)) + geom_col() + coord_flip() + 
+  xlab("country") + 
+  ylab("total co2 emission since 1990")
+```
+
+
+
+### Findings 
++ The top 4 countries which emitted the most C02 in total since 1990 are China, United States, Russia and India.
++ China and the Unites States leads with a huge margin when compared to other countries.. 
++ Countries such as Poland, Ukraine, Indonesia Brazil rank much lower 
+
+
+
+ 
+
+
+Part B {data-navmenu="Question 2"}
+===================================== 
+Answering **Research Questions 2**
+
+Column {data-height=800}
+-------------------------------------
+
+### Fig:1 Which country has made the best progress in reducing CO2 emissions during the last decade? {data-width=65}
+
+```{r}
+cum <- dt %>%
+  filter(year>= 1990 & year <= 2018) %>% 
+  select(country, year, co2_percap) %>% 
+  group_by(country) %>% 
+  summarise(cum_co2pc08 = sum(co2_percap, na.rm = TRUE))
+
+inc <- dt %>%
+  filter(year >= 2008 & year <= 2018) %>% 
+  select(country, year, co2_percap) %>% 
+  group_by(country) %>% 
+  summarise(inc_0818 = sum(co2_percap, na.rm = TRUE))
+
+co2_inc_rank <- cum %>% inner_join(inc, by = "country") %>% 
+  mutate(pct_inc = inc_0818 / cum_co2pc08) %>% 
+  arrange(pct_inc)
+
+data2 <- dt %>%
+  filter(year >= 2008 & year <= 2018) %>% 
+  select(country, year, co2_percap) %>% 
+  mutate(co2pcnew = co2_percap / cum$cum_co2pc08)
+
+a <- co2_inc_rank %>% 
+  slice(which(row_number() %% 30 == 1)) %>% 
+  left_join(data2, by = "country") 
+a %>% 
+  ggplot(aes(x = year, y = co2pcnew, colour = country)) +
+  geom_line() + 
+  scale_colour_discrete(guide = "none") +
+  geom_text(data = a %>%
+  filter(year == max(year)), aes(label = country, 
+                                 x = year + 2, 
+                                 y = co2pcnew, 
+                                 color = country)) + 
+  coord_cartesian(clip = 'off') +
+  ylab("co2 per capita adjusted for starting level")
+```
+
+### {data-width=35}
+
+```{r}
+cum <- dt %>%
+  filter(year>= 1990 & year <= 2008) %>% 
+  select(country, year, co2_percap) %>% 
+  group_by(country) %>% 
+  summarise(cum_co2pc08 = sum(co2_percap, na.rm = TRUE))
+
+inc <- dt %>%
+  filter(year >= 2008 & year <= 2018) %>% 
+  select(country, year, co2_percap) %>% 
+  group_by(country) %>% 
+  summarise(inc_0818 = sum(co2_percap, na.rm = TRUE))
+
+cum %>% inner_join(inc, by = "country") %>% 
+  mutate(pct_inc = inc_0818 / cum_co2pc08) %>% 
+  arrange(pct_inc)
+```
+
+Row {data-height=200}
+-------------------------------------
+
+### Findings
+
+- North Korea has made the most progress in reducing carbon dioxide emissions in the past decade
+- North Korea has made little contribution to the overall process of reducing carbon dioxide emissions.
+
+
+
+Part A {data-navmenu="Question 3"}
+===================================== 
+Answering **Research Questions 3**
+
+
+Column {data-width=600}
+-------------------------------------
+
+### Fig:1 How does CO2 emission of Australia behave over the years compared to top two emitters?
+
+
+```{r}
+data <- dt %>% filter(country %in% c("Australia", "United States", "China")) %>%
+  select(Code,country,co2,year, co2_percap)
+
+p2 <- data %>%
+  filter(country == "Australia") %>% 
+  ggplot(aes(x = year, y = co2)) + geom_line() +
+  ggtitle("Australian CO2 emission")
+ggplotly(p2)
+```
+
+###
+
+```{r}
+p3 <- data %>% ggplot(aes(x = year, y = co2, colour = country)) + geom_line() + 
+  ggtitle("Australian CO2 emission comparing with top 2 emitters")
+ggplotly(p3) 
+```
+
+## Findings
+### Findings
+
++ This line graph shows co2 emission in Australia, United States and China over the years 1850 - 2018.
+
++ The graph clearly depicts that China has the highest co2 emission compared to Australia and US. This is mainly due to the fact that higher standards of living, comparatively fossil-intensive electric power, and its role as the manufacturer of goods consumed around the world. 
+
++ The highest co2 emission was recorded in the year 2018 whereas the lowest co2 emission was recorded in the year 1960 in Australia.
+
++ The highest amount of co2 emission was recoreded in the past decade compared to the other years.
+
++ Co2 emission gradually started changing after the year 1850 along with the industrial revolution but a clear peak can be observed after the year 1950.
+
++ Australia has a more flatter curve compared to other 2 countries in the recent years and the main cause for this is decrease in transport emissions due to COVID-19 restrictions, reduced fugitive emissions, and reductions in emissions from electricity.
+
++ There are some fluctuations in United States Co2 emission over the years 1900 and 1950 which is maily due to the fossil fuels that people are burning for energy.
+
+
+Part B {data-navmenu="Question 3"}
+===================================== 
+Answering **Research Questions 3**
+
+Column {data-width=600}
+-------------------------------------
+
+### Fig:1 How does CO2 emission of Australia behave over the years compared to top two emitters?
+
+
+```{r plotly}
+p1 <- data %>%
+  filter(country == "Australia") %>% 
+  ggplot(aes(x = year, y = co2_percap)) + geom_line() +
+  ylab("CO2 per capita") +
+  ggtitle("Australian CO2 emission per capita")
+ggplotly(p1)
+```
+
+###
+
+```{r}
+p01 <- data %>% ggplot(aes(x = year, y = co2_percap, colour = country)) + geom_line() +
+  ylab("CO2 per capita") +
+  ggtitle("Australian CO2 emission per capita comparing with top 2 emitters")
+ggplotly(p01)
+```
+
+
+## Findings
+### Findings
+
++ This line graphs shows how co2 emission per person behaivour over the years 1961 - 2018 in Australia, United States and China. 
+
++ The highest co2 emission country was United States over the year compared to other 2 countries. The line graph clearly shows fluctuations between years 1900 and 1950 for United States. This was mainly due to burning of fossil fuels, increased electricla consumption in domestics and manufacturing in vehicles.  
+
++ The co2 per capita emission started to decline since 2004. This may be due to the fact that Australian government has put more attention on climate change issue and they may have encourage clean energy generation such as solar. 
+
++ After year 1900 the trend starts to steeping this is because of country was developing at that period of time.
+
++ One of the main observations is that China has started co2 emission per person after the 1900. 
+
++ Compared to China,co2 emission of Australia and US have dropped over the past few years this is due to coal to gas switching in the power sector and by people, reduced electricity use and changes in transport emissions. 
+
++ As United States and China are among the most populative countries the co2 per capita emission is always high compared to Australia.
+
+Question 4
+===================================== 
+Answering **Is there a relationship between co2 emission and country size or life expectancy?**
+
+```{r include=FALSE}
+dt <- read_csv("final_data.csv")
+dt1 <- dt %>%
+  na.omit() %>% 
+  filter(year == 2018) %>% 
+  mutate(tot_fos = fos_percap * population / 1000000,
+         co2 = co2 / 1000000,
+         population = population / 1000000,
+         gdp = gdp / 1000000000,
+         total_production_tone = total_production_tone / 1000000,
+         total_size_km2 = total_size_km2 / 1000) %>% 
+  select(co2, total_size_km2, population, total_production_tone, life_expectancy, gdp, tot_fos)
+fit1 <- lm(co2 ~ ., data = dt1) %>% step(trace = FALSE)
+
+dt2 <- dt %>% 
+  filter(country == "United States", year >= 1950)
+dt2 <- dt2 %>% 
+  mutate(life_expectancy = impute_below(life_expectancy),
+         total_production_tone = impute_below(total_production_tone),
+         fos_percap = impute_mean(fos_percap)) %>% 
+  mutate(production_percap = total_production_tone / population,
+         gdp_percap = gdp_percap / 1000,
+         fos_percap = fos_percap / 1000)
+
+fit2 <- lm(co2_percap ~ gdp_percap + production_percap + life_expectancy + fos_percap, data = dt2)
+fit02 <- lm(co2_percap ~ gdp_percap + I(gdp_percap^2) + production_percap + life_expectancy + fos_percap, data = dt2)
+
+dt3 <- dt %>% 
+  filter(country == "China", year >= 1950)
+dt3 <- dt3 %>% 
+  mutate(life_expectancy = impute_below(life_expectancy),
+         total_production_tone = impute_below(total_production_tone),
+         fos_percap = replace(fos_percap,is.na(fos_percap), 1000)) %>% 
+  mutate(production_percap = total_production_tone / population)
+
+fit3 <- lm(co2_percap ~ gdp_percap + production_percap + life_expectancy + fos_percap, data = dt3)
+summary(fit3)
+dt4 <- dt %>% 
+  filter(country == "Russia", year >= 1950)
+dt4 <- dt4 %>% 
+  mutate(gdp = impute_below(gdp),
+         life_expectancy = impute_median(life_expectancy),
+         total_production_tone = impute_median(total_production_tone),
+         fos_percap = impute_mean(fos_percap)) %>% 
+  mutate(production_percap = total_production_tone / population,
+         gdp_percap = gdp / population)
+fit4 <- lm(co2_percap ~ gdp_percap + production_percap + life_expectancy + fos_percap, data = dt4)
+fit04 <- lm(co2_percap ~ gdp_percap + I(gdp_percap^2) + production_percap + life_expectancy + fos_percap, data = dt4)
+```
+
+## row2 {.tabset .tabset-fade}
+
+### Visulisation - country size
+
+<div style='display:flex; flex-direction:column; justify-content:space-evenly; align-items:left;'>
+
+<div>
+
+```{r fig.dim = c(10, 6.5)}
+p1 <- dt1 %>% ggplot(aes(x = total_size_km2, y = co2)) +
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  ggtitle("Relationship between Co2 Emission and Country Size")+
+  xlab("Total Country Size in km") +
+  ylab("Co2 Emission") 
+ggplotly(p1)
+```
+
+</div>
+
+<div>
+
+**Findings** 
+
++ there is a relationship 
++ positive
+
+</div>
+</div>
+
+
+### Visulisation - life expectancy
+
+<div style='display:flex; flex-direction:column; justify-content:space-evenly; align-items:left;'>
+
+<div>
+
+
+```{r fig.dim = c(10, 6.5)}
+p1<- dt1 %>% ggplot(aes(x = life_expectancy, y = co2)) +
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  ggtitle("Relationship between Co2 Emission and Life Expectancy")+
+  xlab("Total Life Expectancy") +
+  ylab("Co2 Emission") 
+
+ggplotly(p1)
+```
+
+</div>
+
+<div>
+
+**Findings** 
+
++ no obvious relationship
+
+</div>
+</div>
+
+
+### Model
+
+```{r}
+summary(fit1)
+```
+
+**Findings** 
+
++ conclusion for the relationship between life expectancy and co2 emission is consistent
++ conclusion for the relationship between country size and co2 emission is inconsistent
+    + significant
+    + negative
+
+### Diagnostics
+
+<div style='display:flex; flex-direction:column; justify-content:space-evenly; align-items:left;'>
+
+<div>
+
+```{r fig.dim = c(11, 6)}
+resid_panel(fit1, plot = "all")
+```
+
+</div>
+
+<div>
+
+**Findings from the  graph**
+
+- Normality assumption does not hold
+    - Fatter tails than normal distribution
+-  Leftover pattern exist
+- Several outliers
+
+</div>
+
+</div>
+
+
+
+
+
+
+USA {data-navmenu="Question 5"}
+===================================== 
+Answering **Which factors/predictors contribute the most to United States?**
+
+Column {data-width=300}
+-------------------------------------
+
+### Model 1
+
+```{r}
+summary(fit2)
+```
+
+### Model 2
+
+```{r}
+summary(fit02)
+
+```
+
+Column {data-height=200}
+-------------------------------------
+
+### Findings:
+
+- fossil fuel consumption and agriculture production are the significant predictors  
+- increase in production_per_capita / fossil_fuel_consumption_per_capita is likely to cause an increase in co2 emission for America holding else constant
+- Life expectancy is at the margin of significance (10%)
+- non-linear relationship between co2_pc and gdp_pc
+
+
+China {data-navmenu="Question 5"}
+===================================== 
+Answering **Which factors/predictors contribute the most to China?**
+
+Column {data-width=300}
+-------------------------------------
+
+### Model 1 
+
+```{r fig.dim = c(5, 2.5)}
+summary(fit3)
+```
+
+###
+
+```{r fig.dim = c(5, 2.5)}
+dt3 %>% ggplot(aes(x = year, y=co2_percap)) + geom_line()
+dt3 %>% ggplot(aes(x = year, y=fos_percap)) + geom_line()
+dt3 %>% summarise(correlation = cor(fos_percap, co2_percap))
+```
+
+Column {data-height=100}
+-------------------------------------
+
+### Findings
+
+- fossil fuel consumption is vary significant
+- co2 emission is expected to go higher as the country consume more fossil fuel holding else constant 
+- R-squared is extremely large
+- might because of the correlation between fossil consumption and co2 emission
+
+Russia {data-navmenu="Question 5"}
+===================================== 
+Answering **Which factors/predictors contribute the most to Russia?**
+
+Column {data-width=300}
+-------------------------------------
+
+### Model 1
+
+```{r}
+summary(fit4)
+```
+
+### Model 2
+
+```{r}
+summary(fit04)
+```
+
+### Diagnostics 
+
+```{r}
+anova(fit4,fit04, test="F")
+
+```
+
+Column {data-height=200}
+-------------------------------------
+
+### Findings:
+
+- 3 Regressors are very significant: gdp_percap, production_percap and fos_percap. 
+- Relationship between GDPpc and co2pc is non-linear.
+
+
+
+
+
+Question 6
+===================================== 
+Answering **Are they the same factor that contribute the most to co2 emission of each countries?**
+
+
+## row2 {data-height=5}
+
+**Finding**: fossil fuel consumption is an important driver of co2 emission for all the countries
+
+## row3 {data-height=70}
+
+### USA
+
+```{r}
+summary(fit02)
+```
+
+### China
+
+```{r}
+summary(fit3)
+```
+
+### Russia
+
+```{r}
+summary(fit04)
+```
+
+
+Conclusion
+===================================== 
+
+Column {data-height=250}
+-------------------------------------
+    
+### Conclusion 
+    
+
+```{r img4, echo = F, out.width = '6%'}
+knitr::include_graphics("Co2_meme.png")
+```
+   
+Column {data-height=250}
+-------------------------------------
+    
+###
+**Credits** :
+
++ Junyan Zhou  29624819 
+
++ Xueying Li  31964125 
+
++ Kshitija Hire  31972896  
+
++ Senath Laksika Ranaweera  31021670
+
+
+### 
+```{r img5, echo = F, out.width = '3%'}
+knitr::include_graphics("ty4.jpeg")
+```
+    
+### 
+```{r img6, echo = F, out.width = '3%'}
+knitr::include_graphics("aq.jpeg")
+```
+
+
+
+
